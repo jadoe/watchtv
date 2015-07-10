@@ -8,8 +8,9 @@ and uses a very similar frontend.
 
 The sources are hosted at github: http://github.com/jadoe/watchtv
 
-Copyright: 2015		Jane Doe
-           2010-2015	Roman Haefeli
+Copyright:  
+&nbsp;&nbsp;2015 Jane Doe  
+&nbsp;&nbsp;2010-2015 Roman Haefeli
 
 License:   GPL-2 
 
