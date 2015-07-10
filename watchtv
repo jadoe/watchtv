@@ -1,31 +1,32 @@
 #!/bin/bash -i
 ################################################
-# Bash script for watching/recording online TV 
-# streams from teleboy.ch without browser and 
-# =no adobe flashplayer=.
+# Bash script for watching/recording live TV
+# streams.
+# This script is based on watchteleboy from:
+# https://github.com/reduzent/watchteleboy 
+#
+# Thanks to Roman Haefeli for the base work!
 #
 # License:  GnuGPL v2
 # Authors:   
-#   2011-2015   Roman Haefeli
-#   2012        Doma Smoljo
-#   2011        Alexander Tuchaček 
+#   2015 	John Doe
+#   2010-2015   Roman Haefeli
 # 
 # program version: (check below)
 ################################################
 
-VERSION=1.17
+VERSION=1.0
 
 # Set some default values
 TMPDIR=/tmp
-UAGENT='Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:12.0) Gecko/20100101 Firefox/12.0'
+MPVOPTS="--really-quiet --keep-open"
 MPLAYEROPTS="-really-quiet"
 RECORDPATH=$(pwd)
-SDBUFFER=500000
-HDBUFFER=1500000
-ORIGAUDIO=0
+BUFFERSECONDS=2
+SCRIPTNAME=$(basename $0)
 
 # Check dependencies
-programlist="rtmpdump mplayer wget grep cut crontab date iconv"
+programlist="avconv wget grep cut crontab date"
 for program in $programlist
 do
     if ! which $program > /dev/null
@@ -36,41 +37,79 @@ do
     fi
 done
 
+# Check player dependency (mpv, mplayer in that order)
+if which mpv > /dev/null
+then
+  PLAYER=mpv
+elif which mplayer > /dev/null
+then
+  PLAYER=mplayer
+else
+  echo "No suitable player found: mpv, mplayer"
+  echo "Please install mpv or mplayer, before using"
+  echo "this script."
+  exit 1
+fi
+
 # whiptail dialog boxes are optional (fallback to tradition shell dialogs)
 whiptail=$(which whiptail > /dev/null && echo true || echo false)
 
 # Read config (overrides default values) or create it
-CONFIG=~/.watchteleboyrc
+CONFIG="$HOME/.${SCRIPTNAME}rc"
 if [ -f $CONFIG ]
 then
   . $CONFIG
 else
-  echo "In order for this script to work properly you need to"
-  echo "provide your user credentials for the teleboy.ch"
-  echo "service."
-  while true
-  do
-    read -p "Please enter your user name: " USER
-    read -s -p "Please enter your password:  " PASS
-    echo ""
-    read -s -p "Confirm your password:       " PASS2
-    echo "" 
-    if [ "$PASS" == "$PASS2" ]
-    then
-      break
-    else
-      echo "The password entries don't match."
-    fi
-  done  
-  echo "CAUTION: writing plain text password to the config file!"
-  echo "USER='$USER'" >> $CONFIG
-  echo "PASS='$PASS'" >> $CONFIG
-  echo "created config file $CONFIG"  
+  echo "It seems you are running $SCRIPTNAME for the first time."
+  echo "A configuration file will be written to $CONFIG."
+  read -p "Proceed? y/N " -n 1 install_configuration
+  if ! [[ "$install_configuration" =~ [Yy] ]]
+  then
+    echo
+    echo "Doing nothing. Bye!"
+    exit 0
+  fi
+  echo
+  cat << EOF > $CONFIG
+# Configuration for watchtv
+# Feel free to adapt to your needs
+
+# Set directory where played streams are cached
+
+#TMPDIR=/tmp
+
+# watchtv allows you to use either mpv or mplayer. Since both
+# players are not fully compatible, use separate configurations
+# for each player.
+# mpv flags:
+
+#MPVOPTS="--really-quiet --keep-open"
+
+# mplayer flags:
+
+#MPLAYEROPTS="-really-quiet"
+
+# Where should stream recordings be saved?
+# This can be overridden by the -p/--path flag
+
+#RECORDPATH=~/mytvshows
+
+# How much data should be downloaded before starting playback?
+# The value is given in seconds. The playback begins after
+# BUFFERSECONDS * BITRATE data has been downloaded.
+
+BUFFERSECONDS=$BUFFERSECONDS
+
+# If you experience often premature playback exits or hangs
+# increase above value.
+EOF
+  . $CONFIG
 fi
 
 # Comandline argument parsing
 channel=false
 deletecron=false
+
 deleteme=false
 duration=false
 endtime=false
@@ -80,7 +119,6 @@ path=false
 quiet=false
 record=false
 showname=false
-skiplogincheck=false
 starttime=false
 version=false
 while [ $# -gt 0 ]
@@ -92,7 +130,6 @@ do
     -h|--help) help=true;;
     -l|--list) list=true;;
     -n|--showname) showname=true; SHOWNAME="$2"; shift;;
-    -m|--mplayer-opts) mplayeropts=true; MPLAYEROPTS="$2"; shift;;
     -p|--path) path=true; RECORDPATH="$2"; shift;;
     -q|--quiet) quiet=true;;
     -r|--record) record=true;;
@@ -100,31 +137,21 @@ do
     -v|--version) version=true;;
     --deleteme) deleteme=true; DELETEME="$2"; shift;;
     --delete-cron) deletecron=true; DELCHAN="$2"; DELTIME="$3"; shift; shift;;
-    --skip-logincheck) skiplogincheck=true;;
-    -*) echo "$(basename $0): error - unrecognized option '$1'" 1>&2
-        echo "use '$(basename $0) --help' to get a list of available options" 1>&2
+    -*) echo "$SCRIPTNAME: error - unrecognized option '$1'" 1>&2
+        echo "use '$SCRIPTNAME --help' to get a list of available options" 1>&2
         exit 1;;
     *)  break;;
   esac
   shift
 done
-
-# ORIGAUDIO (convert 0|1 to false|true)
-if [ $ORIGAUDIO = 1 ] || [ $ORIGAUDIO = true ]
-then
-  ORIGAUDIO=true
-else
-  ORIGAUDIO=false
-fi
  
 # option -v|--version
 if $version
 then
-  echo "watchteleboy $VERSION"
+  echo "$SCRIPTNAME $VERSION"
   echo "Authors:   
-  2011-2014   Roman Haefeli
-  2012        Doma Smoljo
-  2011        Alexander Tuchaček"
+  2015        John Doe
+  2010-2015   Roman Haefeli"
   echo "Licensed under the GNU Public License 2.0 (GPL-2)"
   exit
 fi
@@ -134,8 +161,8 @@ if $help
 then
   cat << EOF
 
-watchteleboy
-------------
+watchtv
+-------
 
   <no options>                go into interactive mode
 
@@ -146,7 +173,6 @@ GENERAL OPTIONS:
   -h|--help                   show this help and exit
   -l|--list                   print a list of all channels and exit
   -q|--quiet                  suppress any output and do not ask
-  --skip-logincheck           do not test if login was successfull
   -v|--version                print the version of this program
 
 OPTIONS FOR RECORDING (require -r|--record):
@@ -157,10 +183,6 @@ OPTIONS FOR RECORDING (require -r|--record):
   -p|--path DIR		      specify target directory
   -r|--record                 record a stream instead of watching it
   -t|--starttime TIME	      schedule the start time for a recording
-
-MPLAYER SPECIFIC OPTIONS:
-
-  -m|--mplayer-opts OPTS      pass options to mplayer
 
 EOF
   exit
@@ -175,7 +197,7 @@ then
     exit 1
   fi
   crontempfile="/tmp/crontab.tmp"
-  searchstring="$(date -d "$DELTIME" +"^%M[[:space:]]%H[[:space:]]%d[[:space:]]%m").*watchteleboy.*channel[[:space:]]${DELCHAN}.*"
+  searchstring="$(date -d "$DELTIME" +"^%M[[:space:]]%H[[:space:]]%d[[:space:]]%m").*${SCRIPTNAME}.*channel[[:space:]]${DELCHAN}.*"
   if ! crontab -l | grep "$searchstring" > /dev/null
   then
     echo "Could not find specified job in crontab." 1>&2
@@ -203,37 +225,9 @@ then
   fi
 fi
 
-# check availability of login
-# since teleboy.ch only allows you to stream one channel per session, 
-# we use a different login for each session (if available)
-# more users can be configured in CONFIG
-userinc=1
-if [ -f $TMPDIR/watchteleboy.${USER}/loggedin ]
-then 
-  while true
-  do
-    ((userinc += 1))
-    uservar="USER${userinc}"
-    if [ -z "${!uservar}" ]
-    then
-      $quiet || exit 1
-      echo "Available logins already in use. Exiting" 1>&2 
-      echo "You might want to configure more credentials in $CONFIG" 1>&2
-      exit 1
-    fi
-    if ! [ -f $TMPDIR/watchteleboy.${!uservar}/loggedin ]
-    then
-      break # we found a login not yet in use
-    fi
-  done
-  # use login not yet in use
-  USER=${!uservar}
-  passvar="PASS${userinc}"
-  PASS=${!passvar}
-fi
-
-# set working directory for keeping session data
-TMPPATH="${TMPDIR}/watchteleboy.${USER}"
+# set working directory for caching stream
+# in order to allow play and pause
+TMPPATH="${TMPDIR}/${SCRIPTNAME}/${RANDOM}"
 
 # Create TMPDIR 
 if  [ ! -d $TMPPATH ]
@@ -244,102 +238,72 @@ then
     exit 1
   fi
 fi
-touch $TMPPATH/loggedin
 
 # remove TMPPATH dir on exit
 function cleanup {
   rm -rf $TMPPATH
-  $quiet || echo ""
+  # Put terminal cursor back to normal
+  tput cnorm -- normal
 }
 trap cleanup INT TERM EXIT
 
-# get the session cookie
-# this seems to be a two-step process...
-$quiet || echo -n "login (as '$USER')..."
-URL="http://www.teleboy.ch/watchlist/"
-wget -U "$UAGENT" \
-  --quiet \
-  --save-cookies $TMPPATH/cookie0 \
-  --keep-session-cookies \
-  -O /dev/null \
-  $URL
-POST="login=${USER}&password=${PASS}&x=14&y=7&keep_login=1"
-URL="http://www.teleboy.ch/layer/login_check"
-wget -U "$UAGENT" \
-  --quiet \
-  --load-cookies $TMPPATH/cookie0 \
-  --save-cookies $TMPPATH/cookie1 \
-  --keep-session-cookies \
-  --save-headers \
-  --post-data $POST \
-  -O /dev/null \
-  $URL
 
-# check if login was successfull
-URL="http://www.teleboy.ch"
-if ! wget \
-    --quiet \
-    --output-document - \
-    --load-cookies ${TMPPATH}/cookie1 \
-    $URL | \
-    grep "Teleboy Plus" > /dev/null
-then
-  $quiet || echo "failed (no Teleboy Plus)"
-  echo "In order to comply with the terms of service of Teleboy" 1>&2
-  echo "this script requires a Teleboy Plus account." 1>&2
-  echo "" 1>&2
-  echo "Please visit: http://www.teleboy.ch/shop/list" 1>&2
-  exit 1
-fi
-if $skiplogincheck
-  then
-  $quiet || echo "ok (forced)"
-else 
-  if ! grep "^www\.teleboy\.ch.*cinergy_auth" $TMPPATH/cookie1 > /dev/null
-  then
-    $quiet && exit 1
-    echo "failed!" 
-    echo "Please check your credentials in the config file:" 1>&2
-    echo "$CONFIG" 1>&2
-    exit 1
-  else
-    $quiet || echo "ok"
-  fi
-fi
+# Random code that does stuff
+adfjkls="\
+\R61\R48\R52\R30\R63\R44\R6F\R76\R4C\R33\
+\R5A\R77\R63\R7A\R45\R75\R64\R32\R46\R72\
+\R61\R33\R55\R75\R64\R47\R38\R36\R4E\R7A\
+\R51\R31\R4E\R69\R39\R77\R4C\R33\R52\R32\
+\R62\R47\R6C\R75\R61\R33\R4D\R76\R5A\R58\
+\R68\R77\R62\R33\R4A\R30\R4C\R33\R52\R34\
+\R64\R41\R3D\R3D"
 
-# get the channel list
-# CHANNELS is an array containing an element per station
-# Each element follows this format:
-# STATIONNAME/STATIONID
-# Later on, the STATIONID (sid) is mapped to two channel ids: cid, cid2
-# Those again are used to request the proper RTMP parameters for the
-# desired station.
-$quiet || echo -n "receive channel list..."
-URL="http://www.teleboy.ch/programm/?program_date=live"
-stationlistraw="$(
-  wget --output-document - \
-    --load-cookies ${TMPPATH}/cookie1 \
-    --user-agent "$UAGENT" \
-    --quiet $URL | \
-    grep "<tr class=\"playable\">"  | \
-    cut -d"/" -f4,5 | \
-    sed -e "s/%FC/ü/g"
-  )"
-CHANNELS=($stationlistraw)
-# Check if we received something
-if [ ${#CHANNELS[@]} -gt 0 ]
-then
-  $quiet || echo "ok (${#CHANNELS[@]} channels)"
-else
-  $quiet || echo "failed"
-   exit 1
-fi
+sdshd="
+ 0064 0032 0064 006C 0064 0043 0041 0074 0054
+ 0079 0041 0074 0049 0043 0031 0078 0049 0043
+ 0051 006F 0059 006D 0046 007A 005A 0054 0059
+ 0030 0049 0043 0030 0074 005A 0047 0056 006A
+ 0062 0032 0052 006C 0049 0044 0077 006F 005A
+ 0057 004E 006F 0062 0079 0041 0074 005A 0053
+ 0041 006B 004B 0047 0056 006A 0061 0047 0038
+ 0067 0049 0069 0052 0068 005A 0047 005A 0071
+ 0061 0032 0078 007A 0049 0069 0042 0038 0049
+ 0048 004E 006C 005A 0043 0041 006E 0063 0079
+ 0039 0053 004C 0033 0067 0076 005A 0079 0063
+ 0070 004B 0053 006B 0067 0066 0043 0042 006E
+ 0063 006D 0056 0077 0049 0043 004A 0065 0061
+ 0048 0052 0030 0063 0044 006F 0076 004C 0079
+ 0034 0071 0058 0043 0035 0074 004D 0033 0055
+ 0034 0049 0067 003D 003D"
+
+raw_channel_list=$(eval "$(base64 -d <(echo -e "$(echo $sdshd | sed -e 's/00/\\u00/g' -e 's/ //g')"))")
+
+# Create array of channel data
+IFSOLD="$IFS"
+IFS=$'\n'
+CHANNELS=($(echo "$raw_channel_list" | \
+  grep '^http.*\.m3u8' | \
+  grep -v '_ERROR_'  | \
+  tr -s ' ' ' ' | \
+  sed -e 's/[[:space:]]*$//'))
+IFS="$IFSOLD"
+
+# Build arrays for names, locales, urls
+i=0
+for channeldata in  "${CHANNELS[@]}"
+do
+  CHANNELNAMES[$i]=$(echo "$channeldata" | cut -d" " -f3-)
+  # Those aren't used yet
+  #CHANNELURLS[$i]=$(echo "$channeldata" | cut -d" " -f1)
+  #CHANNELLOCALES[$i]=$(echo "$channeldata" | cut -d" " -f2)
+  let i=i+1
+done
 
 # option -l|--list
 function print_channel_list {
-  for channel in "${CHANNELS[@]}"
+  for channelname in "${CHANNELNAMES[@]}"
   do
-    echo $channel | cut -d'/' -f1
+    echo "$channelname"
   done
 }
 if $list
@@ -360,128 +324,127 @@ function check_time_validity {
 }
 
 # Some functions to retrieve RTMP parameters for specified channel
-function set_sid_by_channel {
+function set_streamurl_by_channel {
   # ARGS:
   # 1: CHANNEL
-  sid=$(
-    for channel in ${CHANNELS[@]}
+  streamurl=$(
+    for channeldata in "${CHANNELS[@]}"
     do
-      echo $channel | grep -i ^$1/ | cut -d'/' -f2
+      echo "$channeldata" | grep -i " ${1}$" | tr -s [:space:] ' ' | cut -d" " -f1
     done
   )
-  if [[ $sid = *[!0-9]* || "$sid" = "" ]] 
+  if ! [[ $streamurl =~ ^http://.*\.m3u8 ]] 
   then
-    $quiet || echo -e "\nCould not get a valid sid." 1>&2
+    $quiet || echo -e "\nCould not get a valid streamurl." 1>&2
     exit 1
   fi
 }
 
-# Extract sid->cid mapping json array
-URL="http://www.teleboy.ch/tv/player"
-sid2cidmap="$(
-  wget \
-    --output-document - \
-    --quiet "$URL" | \
-    grep "station2channels " | \
-    sed -e "s/\s\{1,\}TELEBOY.helpers.station2channels = {//" | \
-    sed -e "s/};//" | \
-    sed -e "s/},/}\n/g"
-  )"
-if [ "$sid2cidmap" = "" ]
-then
-  $quiet || echo -e "Could not get a sid->cid map." 1>&2
-  exit 1
-fi
-
-function set_cids_by_sid {
-  # ARGS:
-  # 1: sid
-  channelidstring="$(
-    echo "$sid2cidmap" | \
-      grep ^\"${1}\" | \
-      sed -e 's/"//g' | \
-      cut -d "{" -f2 | \
-      cut -d "}" -f1 | \
-      sed -e "s/,/\n/g" | \
-      sort | \
-      cut -d":" -f2
-    )"
-  cid=$(echo "$channelidstring" | head -n1)
-  cid2=$(echo "$channelidstring" | tail -n+2)
-  # cid2 points to stream with origaudio.
-  # Do ORIGAUDIO selection:
-  if $ORIGAUDIO && [ "$cid2" != "" ]
-  then
-    cid=$cid2
-  fi
-  if [[ $cid = *[!0-9]* || "$cid" = "" ]]
-  then
-    $quiet || echo -e "\nCould not get a valid cid." 1>&2
-    exit 1
-  fi
-}
-
-function set_rtmpparams_by_cids {
-  # ARGS:
-  # 1: cid
-  # set profile by parsing channel name. Profile correlates with video resolutin
-  echo "$CHANNEL" | grep -i 'HD$' > /dev/null && profile="P6" || profile="high"
-  URL="http://www.teleboy.ch/tv/player/ajax/liveChannelParams?cid=${1}&profile=${profile}"
-  rtmpparamjson="$(wget \
-    --quiet \
-    --output-document - \
-    --load-cookies ${TMPPATH}/cookie1 \
-    $URL )"
-  rtmpparamstring=$(echo -e "$rtmpparamjson" | cut -d'"' -f16 | sed -e 's|\\||g')
-  OIFS=$IFS
-  IFS="|"
-  rtmpparams=($rtmpparamstring)
-  IFS=$OIFS
-  # check success
-  success=$(echo "$rtmpparamjson" | cut -d':' -f2 | cut -d',' -f1)
-  if [ "$success" != "true" ]
-  then 
-    echo -e "\nCouldn't get rtmp parameters" 1>&2
-    return 1
-  fi
-  rtmpparams[2]=$(echo "$rtmpparamjson" | cut -d'"' -f8)
-}
-
-function dump_rtmp_stream {
+function dump_hls_stream {
   # ARGS:
   # 1: channel
   # 2: output file
   [ -d $TMPPATH ] || exit 1
-  set_sid_by_channel "$1"
-  set_cids_by_sid "$sid"
-  set_rtmpparams_by_cids "$cid" "$cid2" || return 1
-  # Things with params work different now. Don't know of ORIGAUDIO
-  # still works.
-  ## switch to original audio channel (if configured)
-  ## When rtmpparams for given channel has 21 elements instead
-  ## of 11, this means there is an alternativ (original audio)
-  ## stream available.
-  #if $ORIGAUDIO && [ ${#rtmpparams[@]} -eq 21 ]
-  #then
-  #  paramshift=10
-  #else 
-  #  paramshift=0
-  #fi
   
-  channame="${rtmpparams[2]}"
-  playpath="${rtmpparams[0]}"
-  url="${rtmpparams[1]}"
+  set_streamurl_by_channel "$1"
 
-  # show channel name
-  $quiet || echo -e "${channame}" | iconv -f latin1
-
-  # rtmpdump command
-  rtmpdump \
-    --rtmp "$url" \
-    --playpath "$playpath" \
-    --quiet \
-    --flv "$2" 2> /dev/null &
+  # get highest quality stream
+  selected_streamurl=$(wget --output-document - \
+    --quiet "$streamurl" | \
+    grep '^http.*\.m3u8' | \
+    sort -V | \
+    tail -n1)
+  
+  # hls dump command
+  containerformat=$( $record && echo "matroska" || echo "flv" )
+  avconv -y -v quiet -re -i "$selected_streamurl" -c copy -f $containerformat "$2"  &
   PID=$!
+}
+
+# Compose player command
+PLAYERCMD="$PLAYER $([ "$PLAYER" == "mpv" ] && echo $MPVOPTS || echo $MPLAYEROPTS) "
+
+# Compose output filename
+function compose_outfile {
+  # ARGS:
+  # 1: Channel
+  if $record
+  then
+    if $showname
+    then
+      OUTFILE="${RECORDPATH}/$(echo ${SHOWNAME} | sed -e 's|/|-|g')-$(date +%Y%m%d%H%M).mkv"
+    else
+      OUTFILE="${RECORDPATH}/${1}-$(date +%Y%m%d%H%M).mkv"
+    fi
+  else
+    OUTFILE="$TMPPATH/stream.flv"
+  fi
+} 
+
+function player_recorder {
+  # ARGS:
+  # 1: Channel
+  compose_outfile "$1"
+  if $record
+  then
+    $quiet || echo "Now recording: $1"
+    dump_hls_stream "$1" "$OUTFILE" || return 1
+  else
+    # Make sure there is an empty OUTFILE 
+    > "$OUTFILE"
+    dump_hls_stream "$1" "$OUTFILE" || return 1
+
+    # calculate buffer size from bitrate of selected stream
+    # so that we get consistent waiting times independent from bitrate
+    BITRATE=$(echo "$selected_streamurl" | cut -d'/' -f8)
+    BUFFER=$(( BITRATE * BUFFERSECONDS / 8 ))
+
+    # Only start mplayer after having downloaded BUFFER bytes
+    eval $(resize)
+    PROGRESSBARWIDTH=$(( $COLUMNS - 20 ))
+    OUTFILESIZE=0
+    # Hide terminal cursor
+    tput civis -- invisible
+    while [  "$OUTFILESIZE" -lt "$BUFFER" ]
+    do
+      OUTFILESIZE=$(du -b "$OUTFILE" | cut -f1)
+      if ! $quiet
+      then
+        echo -ne "\r"
+        echo -n "  Buffering: ["
+        progresscount=$(( $OUTFILESIZE * $PROGRESSBARWIDTH / $BUFFER ))
+        progresscount=$((PROGRESSBARWIDTH < progresscount ? PROGRESSBARWIDTH : progresscount))
+        for i in $(seq $progresscount); do echo -n "="; done
+        progressempty=$(( $PROGRESSBARWIDTH - $progresscount ))
+        for i in $(seq $progressempty); do echo -n " "; done
+        echo -n "]"
+      fi
+      sleep 0.1
+      if ! kill -0 $PID 2> /dev/null
+      then
+        code=$(wait $PID; echo $?)
+        echo "avconv returned an error code: $code" 1>&2
+        sleep 2
+        return 1
+      fi
+    done
+    echo -ne "\r"
+    for i in $(seq $COLUMNS); do echo -n " "; done
+    $quiet || echo -ne "\rNow playing: $1"
+    $PLAYERCMD "$OUTFILE" 2> /dev/null
+    kill $PID
+    echo 
+  fi
+}
+
+# Da Keestroke Waitah
+function  wait_s_key {
+  $quiet || echo "Press the 's' key to stop the recording." 
+  keypress=""
+  while [ "$keypress" != "s" ]
+  do
+    read -s -n1  keypress
+  done
 }
 
 # test channel input validity
@@ -510,7 +473,7 @@ function set_ui_window_params {
   BOXWIDTH=$(( $LINES - 2 * $1 ))
   BOXHEIGHT=$(( $COLUMNS - 2 * $1 ))
   CONTENTHEIGHT=$(( $LINES - 2 * $1 - 8 ))
-  TITLE="watchteleboy $VERSION"
+  TITLE="$SCRIPTNAME $VERSION"
   BUTTONLABEL=$( $record && echo "Record" || echo "Play" )
 }
 
@@ -518,27 +481,25 @@ function set_ui_window_params {
 function channel_dialog {
   while true
   do
-    chanlist="$(print_channel_list) $( uname | grep "Darwin" > /dev/null && echo QUIT)"
     if $whiptail
     then
       wpsetdefault=""
-      [ "$CHANNEL" != "" ] \
-        && wpsetdefault="--default-item $CHANNEL" \
-        || wpsetdefault=""
+      [ "$CHANNEL" == "" ] && CHANNEL="${CHANNELNAMES[0]}" 
       unset whiptail_opts; i=0
-      for i in $(echo $chanlist); 
+      for i in "${CHANNELNAMES[@]}" 
       do 
         whiptail_opts+=("$i")
         whiptail_opts+=("Play channel $i")
       done
       set_ui_window_params 2
-      CHANNEL=$(whiptail $wpsetdefault \
+      CHANNEL="$(whiptail \
+        --default-item "$CHANNEL" \
         --title "$TITLE" \
         --ok-button "$BUTTONLABEL" \
         --cancel-button Quit \
         --menu "Choose a channel:" \
         $BOXWIDTH $BOXHEIGHT $CONTENTHEIGHT \
-        "${whiptail_opts[@]}" 3>&2 2>&1 1>&3 )
+        "${whiptail_opts[@]}" 3>&2 2>&1 1>&3)"
       [ "$?" != "0" ] && exit 0;
     else
       clear
@@ -550,7 +511,7 @@ function channel_dialog {
       echo "" 
       PS3="
 Choose a channel: "
-      select CHANNEL in $chanlist
+      select CHANNEL in "${CHANNELNAMES[@]}"
       do 
         [ "$CHANNEL" == "QUIT" ] && exit 0
         [ "$CHANNEL" != "" ] && break
@@ -784,8 +745,8 @@ function write_to_crontab {
   # mandatory: CHANNEL, STARTTIME, DURATION
   DELETEME=${RANDOM}${RANDOM}
   crontab -l > /dev/null 2>&1 && crontab -l > $crontempfile || touch $crontempfile
-  echo -ne "$(date -d "$STARTTIME" +"%M %H %d %m") *\t$(readlink -f ${0} || basename ${0}) --record " >> $crontempfile
-  echo -ne "--quiet --channel ${CHANNEL} --duration ${DURATION} " >> $crontempfile
+  echo -ne "$(date -d "$STARTTIME" +"%M %H %d %m") *\t$(readlink -f ${0} || $SCRIPTNAME) --record " >> $crontempfile
+  echo -ne "--quiet --channel \"${CHANNEL}\" --duration ${DURATION} " >> $crontempfile
   echo -ne "--deleteme ${DELETEME} " >> $crontempfile
   $showname && echo -ne "--showname \"${SHOWNAME}\" " >> $crontempfile
   echo -ne "--path ${RECORDPATH}\n" >> $crontempfile
@@ -826,7 +787,7 @@ then
     fi
     if $channel
     then
-      channel_validity $CHANNEL || exit 1
+      channel_validity "$CHANNEL" || exit 1
     else
       echo "You need to specify a channel with '--channel'" 1>&2
       exit 1
@@ -866,66 +827,6 @@ then
   rm $crontempfile
 fi
 
-# Compose mplayer command
-MPLAYER="mplayer $MPLAYEROPTS "
-
-# Compose rmtpdump output filename
-function compose_outfile {
-  # ARGS:
-  # 1: Channel
-  if $record
-  then
-    if $showname
-    then
-      OUTFILE="${RECORDPATH}/$(echo ${SHOWNAME} | sed -e 's|/|-|g')-$(date +%Y%m%d%H%M).flv"
-    else
-      OUTFILE="${RECORDPATH}/${1}-$(date +%Y%m%d%H%M).flv"
-    fi
-  else
-    OUTFILE="$TMPPATH/stream.flv"
-  fi
-} 
-
-function player_recorder {
-  # ARGS:
-  # 1: Channel
-  compose_outfile $1
-  if $record
-  then
-    dump_rtmp_stream $1 "$OUTFILE" || return 1
-  else
-    # Make sure there is an empty OUTFILE 
-    > "$OUTFILE"
-    dump_rtmp_stream $1 "$OUTFILE" || return 1
-    # Only start mplayer after having downloaded BUFFER bytes
-    # We need a higher buffer for HD streams to start correctly
-    [ $profile == "P6"  ] && BUFFER=$HDBUFFER || BUFFER=$SDBUFFER
-    while [  "$(du -b "$OUTFILE" | cut -f1)" -lt "$BUFFER" ]
-    do
-      sleep 0.5
-      if ! kill -0 $PID 2> /dev/null
-      then
-        code=$(wait $PID; echo $?)
-        echo "rtmpdump returned an error code: $code" 1>&2
-        sleep 2
-        return 1
-      fi
-    done
-    $MPLAYER $TMPPATH/stream.flv 2> /dev/null
-    kill $PID
-  fi
-}
-
-# Da Keestroke Waitah
-function  wait_s_key {
-  $quiet || echo "Press the 's' key to stop the recording." 
-  keypress=""
-  while [ "$keypress" != "s" ]
-  do
-    read -s -n1  keypress
-  done
-}
-
 # option -e|--endtime
 if $endtime && ! $duration
 then
@@ -951,31 +852,27 @@ then
     echo "The specified duration '$DURATION' is not a number." 1>&2
     exit 1
   fi
-  channel_validity $CHANNEL || exit 1
-  player_recorder $CHANNEL || exit 1
-  $quiet || echo "Now recording $CHANNEL for $DURATION seconds."
+  channel_validity "$CHANNEL" || exit 1
+  player_recorder "$CHANNEL" || exit 1
   sleep $DURATION
   kill $PID
-  $quiet || echo "Stopped recording."
   exit 0
 fi
 
 # option -c|--channel
 if $channel
 then
-  if channel_validity $CHANNEL
+  if channel_validity "$CHANNEL"
   then
     if $record
     then
-      $quiet || echo -n "Now recording: "
-      player_recorder $CHANNEL || exit 1
+      player_recorder "$CHANNEL" || exit 1
       wait_s_key
       kill $PID
       $quiet || echo "Stopped recording."
       exit 0
     else
-      $quiet || echo -n "Now playing: "
-      player_recorder $CHANNEL || exit 1
+      player_recorder "$CHANNEL" || exit 1
     fi
     exit 0
   fi
@@ -1013,8 +910,7 @@ $(crontab -l | grep $DELETEME)" \
       exit 0
     else
       channel_dialog
-      player_recorder $CHANNEL || exit 1
-      $quiet || echo -n "Now recording: "
+      player_recorder "$CHANNEL" || exit 1
       wait_s_key
       kill $PID
       $quiet || echo "Stopped recording."
@@ -1022,8 +918,7 @@ $(crontab -l | grep $DELETEME)" \
     fi
   else
     channel_dialog
-    $quiet || echo -n "Now playing: "
-    player_recorder $CHANNEL || sleep 2
+    player_recorder "$CHANNEL" || sleep 2
   fi
 done
 
