@@ -1,16 +1,15 @@
 Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?rev=166
-Upstream-Name: watchteleboy
-Upstream-Contact: Roman Haefeli <reduzent@gmail.com>
-Source: https://github.com/reduzent/watchteleboy
+Upstream-Name: watchtv
+Upstream-Contact: Jane Doe <jane.doe@openmailbox.org>
+Source: https://github.com/jadoe/watchtv
 
-Files: watchteleboy
-Copyright: 2011-2012 Roman Haefeli <reduzent@gmail.com>
-           2012      Doma Smoljo <doma@bitnik.org
-           2011      Alexander Tuchaček <tuchacek@krcf.org>
+Files: watchtv
+Copyright: 2015	     Jane Doe <jane.doe@openmailbox.org>
+           2010-2015 Roman Haefeli <reduzent@gmail.com>
 License: GPL-2
 
 Files: *
-Copyright: 2011-2012 Roman Haefeli <reduzent@gmail.com>
+Copyright: 2015      Jane Doe <jane.doe@openmailbox.org>
 License: GPL-2+
 
 License: GPL-2

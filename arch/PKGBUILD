@@ -3,17 +3,17 @@
 # NOTE: Please fill out the license field for your package! If it is unknown,
 # then please put 'unknown'.
 
-# Maintainer: Ramón Cahenzli <rca@psy-q.ch> 
-pkgname=watchteleboy
+# Maintainer: Jane Doe <jane.doe@openmailbox.org> 
+pkgname=watchtv
 pkgver=1.2
 pkgrel=2
 epoch=
-pkgdesc="Script to watch streams from teleboy.ch without browser/flash"
+pkgdesc="Script to watch and record live HDTV streams"
 arch=('any')
-url="https://github.com/reduzent/watchteleboy"
+url="https://github.com/jadoe/watchtv"
 license=('GPL')
 groups=()
-depends=('mplayer' 'rtmpdump' 'wget')
+depends=('mpv' 'libav-tools' 'wget')
 makedepends=()
 checkdepends=()
 optdepends=()
@@ -29,14 +29,14 @@ noextract=()
 md5sums=('40e689c1fcd0d9c29e43a7150bc74bfa')
 
 package() {
-  install -D -m 755 watchteleboy $pkgdir/usr/bin/watchteleboy
+  install -D -m 755 watchtv $pkgdir/usr/bin/watchtv
   install -d -m 755 $pkgdir/usr/share/man/man1/
-  install -D -m 644 DOCS/man/watchteleboy.1 $pkgdir/usr/share/man/man1/
-  install -d -m 755 $pkgdir/usr/share/doc/watchteleboy
-  install -D -m 644 README $pkgdir/usr/share/doc/watchteleboy/
-  install -D -m 644 LICENSE $pkgdir/usr/share/doc/watchteleboy/
-  install -d -m 755 $pkgdir/usr/share/watchteleboy
-  install -D -m 755 tvbrowser $pkgdir/usr/share/watchteleboy 
+  install -D -m 644 DOCS/man/watchtv.1 $pkgdir/usr/share/man/man1/
+  install -d -m 755 $pkgdir/usr/share/doc/watchtv
+  install -D -m 644 README $pkgdir/usr/share/doc/watchtv/
+  install -D -m 644 LICENSE $pkgdir/usr/share/doc/watchtv/
+  install -d -m 755 $pkgdir/usr/share/watchtv
+  install -D -m 755 tvbrowser $pkgdir/usr/share/watchtv 
 }
 
 # vim:set ts=2 sw=2 et:

@@ -1,21 +1,23 @@
-Source: watchteleboy
+Source: watchtv
 Priority: optional
-Maintainer: Roman Haefeli <reduzent@gmail.com>
+Maintainer: Jane Doe <jane.doe@openmailbox.org>
 Build-Depends: debhelper (>= 7.0.50~)
 Standards-Version: 3.9.1
 Section: misc
-Homepage: http://github.com/reduzent/watchteleboy
+Homepage: http://github.com/jadoe/watchtv
 
-Package: watchteleboy
+Package: watchtv
 Architecture: all
-Depends: mplayer,
+Depends: mpv | mplayer,
          wget,
-         rtmpdump,
+         libav-tools,
          ${misc:Depends}
 Suggests: tvbrowser,
          whiptail
-Description: Watch  and record TV streams from teleboy.ch
- Simple program to watch and record teleboy.ch IPTV streams: 
+Description: Watch and record HDTV streams
+ Simple program to watch and record HDTV streams: 
   * No additional ads
   * No flash nor web browser required
+  * Play'n'Pause and seeking back in live stream
+  * Schedule recordings with cron
 
