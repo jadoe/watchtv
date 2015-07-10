@@ -14,8 +14,7 @@ Copyright: 2015		Jane Doe
 License:   GPL-2 
 
 
-Requirements
-------------
+### Requirements
 
  * avconv  
    is used for recording or caching for playback (allows play'n'pause
@@ -29,8 +28,8 @@ Requirements
  * wget
 
 
-Usage
------
+### Usage
+
 
 Do `watchtv --help` to get a quick summary of options. For playback mode,
 you do:
@@ -42,8 +41,8 @@ For recording, you do:
  `watchtv --record [--other-options ARGS]`
 
 
-Bugs
-----
+### Bugs
+
   
 If you find some or if you have a feature request, post them to the author:
 
@@ -54,4 +53,4 @@ or open an issue on the project's issue tracker on github.com:
   https://github.com/jadoe/watchtv
 
 
-ENJOY! -jD
+**ENJOY! -jD**
