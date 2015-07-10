@@ -17,12 +17,12 @@ License:   GPL-2
 Requirements
 ------------
 
- * avconv
+ * avconv  
    is used for recording or caching for playback (allows play'n'pause
    and seeking in live streams).
    You may find it packaged as 'libav-tools' in your distro's repos.
    
- * mpv or mplayer
+ * mpv or mplayer  
    both work, though mpv is preferred and has priority if both
    commands are found. Used to play the streams.
 
