@@ -54,4 +54,5 @@ or open an issue on the project's issue tracker on github.com:
   https://github.com/jadoe/watchtv
 
 
-**ENJOY! -jD**
+**ENJOY!  
+--jD**
