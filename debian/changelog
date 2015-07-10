@@ -5,4 +5,4 @@ watchtv (1.0~trusty~ppa0) trusty; urgency=low
   * Removed authentication related code
   * Added alternative mpv to mplayer
 
- -- Jane Doe <jane.doe@openmailbox.org  Fri, 10 Jul 2015 07:45:51 -0700
+ -- Jane Doe <jane.doe@openmailbox.org>  Fri, 10 Jul 2015 07:45:51 -0700
