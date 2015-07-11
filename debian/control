@@ -9,6 +9,7 @@ Homepage: http://github.com/jadoe/watchtv
 Package: watchtv
 Architecture: all
 Depends: mpv | mplayer,
+         gnupg, 
          wget,
          libav-tools,
          ${misc:Depends}
