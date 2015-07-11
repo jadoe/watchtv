@@ -102,9 +102,19 @@ BUFFERSECONDS=$BUFFERSECONDS
 
 # If you experience often premature playback exits or hangs
 # increase above value.
+
+# Secret needed to decrypt the hdtv channel list:
+#SECRET=
 EOF
   . $CONFIG
 fi
+
+# get the list of channels
+URL=""
+raw_channel_list=$(gpg --output - --quiet --passphrase=$SECRET \
+  <(base64 --decode \
+    <(wget -O - -q "$URL" | sed 's/\r//')\
+   ) 2> /dev/null)
 
 # Comandline argument parsing
 channel=false
@@ -247,52 +257,17 @@ function cleanup {
 }
 trap cleanup INT TERM EXIT
 
-
-# Random code that does stuff
-adfjkls="\
-\R61\R48\R52\R30\R63\R44\R6F\R76\R4C\R33\
-\R5A\R77\R63\R7A\R45\R75\R64\R32\R46\R72\
-\R61\R33\R55\R75\R64\R47\R38\R36\R4E\R7A\
-\R51\R31\R4E\R69\R39\R77\R4C\R33\R52\R32\
-\R62\R47\R6C\R75\R61\R33\R4D\R76\R5A\R58\
-\R68\R77\R62\R33\R4A\R30\R4C\R33\R52\R34\
-\R64\R41\R3D\R3D"
-
-sdshd="
- 0064 0032 0064 006C 0064 0043 0041 0074 0054
- 0079 0041 0074 0049 0043 0031 0078 0049 0043
- 0051 006F 0059 006D 0046 007A 005A 0054 0059
- 0030 0049 0043 0030 0074 005A 0047 0056 006A
- 0062 0032 0052 006C 0049 0044 0077 006F 005A
- 0057 004E 006F 0062 0079 0041 0074 005A 0053
- 0041 006B 004B 0047 0056 006A 0061 0047 0038
- 0067 0049 0069 0052 0068 005A 0047 005A 0071
- 0061 0032 0078 007A 0049 0069 0042 0038 0049
- 0048 004E 006C 005A 0043 0041 006E 0063 0079
- 0039 0053 004C 0033 0067 0076 005A 0079 0063
- 0070 004B 0053 006B 0067 0066 0043 0042 006E
- 0063 006D 0056 0077 0049 0043 004A 0065 0061
- 0048 0052 0030 0063 0044 006F 0076 004C 0079
- 0034 0071 0058 0043 0035 0074 004D 0033 0055
- 0034 0049 0067 003D 003D"
-
-raw_channel_list=$(eval "$(base64 -d <(echo -e "$(echo $sdshd | sed -e 's/00/\\u00/g' -e 's/ //g')"))")
-
 # Create array of channel data
 IFSOLD="$IFS"
 IFS=$'\n'
-CHANNELS=($(echo "$raw_channel_list" | \
-  grep '^http.*\.m3u8' | \
-  grep -v '_ERROR_'  | \
-  tr -s ' ' ' ' | \
-  sed -e 's/[[:space:]]*$//'))
+CHANNELS=($(echo "$raw_channel_list"))
 IFS="$IFSOLD"
 
 # Build arrays for names, locales, urls
 i=0
 for channeldata in  "${CHANNELS[@]}"
 do
-  CHANNELNAMES[$i]=$(echo "$channeldata" | cut -d" " -f3-)
+  CHANNELNAMES[$i]=$(echo "$channeldata" | cut -d"," -f3)
   # Those aren't used yet
   #CHANNELURLS[$i]=$(echo "$channeldata" | cut -d" " -f1)
   #CHANNELLOCALES[$i]=$(echo "$channeldata" | cut -d" " -f2)
@@ -330,7 +305,7 @@ function set_streamurl_by_channel {
   streamurl=$(
     for channeldata in "${CHANNELS[@]}"
     do
-      echo "$channeldata" | grep -i " ${1}$" | tr -s [:space:] ' ' | cut -d" " -f1
+      echo "$channeldata" | grep -i ",${1}$" | cut -d"," -f1
     done
   )
   if ! [[ $streamurl =~ ^http://.*\.m3u8 ]] 
