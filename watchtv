@@ -7,9 +7,9 @@
 #
 # Thanks to Roman Haefeli for the base work!
 #
-# License:  GnuGPL v2
+# License:      GPL-2
 # Authors:   
-#   2015 	John Doe
+#   2015 	Jane Doe
 #   2010-2015   Roman Haefeli
 # 
 # program version: (check below)
@@ -71,14 +71,14 @@ else
   fi
   echo
   cat << EOF > $CONFIG
-# Configuration for watchtv
+# Configuration for $SCRIPTNAME
 # Feel free to adapt to your needs
 
 # Set directory where played streams are cached
 
 TMPDIR=$TMPDIR
 
-# watchtv allows you to use either mpv or mplayer. Since both
+# $SCRIPTNAME allows you to use either mpv or mplayer. Since both
 # players are not fully compatible, use separate configurations
 # for each player.
 # mpv flags:
@@ -189,7 +189,7 @@ if $version
 then
   echo "$SCRIPTNAME $VERSION"
   echo "Authors:   
-  2015        John Doe
+  2015        Jane Doe
   2010-2015   Roman Haefeli"
   echo "Licensed under the GNU Public License 2.0 (GPL-2)"
   exit
@@ -200,7 +200,7 @@ if $help
 then
   cat << EOF
 
-watchtv
+$SCRIPTNAME
 -------
 
   <no options>                go into interactive mode
