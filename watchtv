@@ -26,7 +26,7 @@ BUFFERSECONDS=2
 SCRIPTNAME=$(basename $0)
 
 # Check dependencies
-programlist="avconv wget grep cut crontab date"
+programlist="avconv crontab cut gpg grep wget grep"
 for program in $programlist
 do
     if ! which $program > /dev/null
@@ -76,18 +76,18 @@ else
 
 # Set directory where played streams are cached
 
-#TMPDIR=/tmp
+TMPDIR=$TMPDIR
 
 # watchtv allows you to use either mpv or mplayer. Since both
 # players are not fully compatible, use separate configurations
 # for each player.
 # mpv flags:
 
-#MPVOPTS="--really-quiet --keep-open"
+MPVOPTS="$MPVOPTS"
 
 # mplayer flags:
 
-#MPLAYEROPTS="-really-quiet"
+MPLAYEROPTS="$MPLAYEROPTS"
 
 # Where should stream recordings be saved?
 # This can be overridden by the -p/--path flag
@@ -104,17 +104,46 @@ BUFFERSECONDS=$BUFFERSECONDS
 # increase above value.
 
 # Secret needed to decrypt the hdtv channel list:
-#SECRET=
 EOF
   . $CONFIG
 fi
 
+# get URL
+write_secret_to_config=false
+url_enc="jA0EAwMCzmbtLIotZtZgyT+NSxKv1ITh55OOTJHK+Vh4dE3qHgUCXWJNUfvJ8NuXlARyWi8K36WK
+8tald+GDf8c1kW9go8C8Z/p0+OPTt0c="
+while [ -z "$SECRET" ]
+do
+  echo -ne "\rEnter the secret to get the channel list: "
+  read SECRET
+  write_secret_to_config=true
+done
+while ! URL=$(gpg --output - --quiet --passphrase=$SECRET \
+    <(base64 --decode \
+      <(echo "$url_enc")\
+     ) 2> /dev/null)
+do
+  echo -ne "\rProvided secret is not valid. Enter again: "
+  read SECRET
+  write_secret_to_config=true
+done
+if $write_secret_to_config
+then
+  sed -i '/^SECRET=/d' $CONFIG
+  echo "SECRET=$SECRET" >> $CONFIG
+fi
+
 # get the list of channels
-URL=""
 raw_channel_list=$(gpg --output - --quiet --passphrase=$SECRET \
   <(base64 --decode \
     <(wget -O - -q "$URL" | sed 's/\r//')\
    ) 2> /dev/null)
+
+if [ "$?" -ne "0" ]
+then
+  echo "Decryption of channel list failed. Exiting now." >&2
+  exit 1
+fi
 
 # Comandline argument parsing
 channel=false
