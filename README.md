@@ -42,6 +42,12 @@ For recording, you do:
  `watchtv --record [--other-options ARGS]`
 
 
+### How to create a Debian package
+
+`cd watchtv
+debuild -i -us -uc -b`
+
+
 ### Bugs
 
   
