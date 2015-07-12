@@ -44,7 +44,7 @@ For recording, you do:
 
 ### How to create a Debian package
 
-`cd watchtv`
+`cd watchtv`  
 `debuild -i -us -uc -b`
 
 
