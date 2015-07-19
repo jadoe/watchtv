@@ -20,7 +20,7 @@ TMPDIR=/tmp
 MPVOPTS="--really-quiet --keep-open"
 MPLAYEROPTS="-really-quiet"
 RECORDPATH=$(pwd)
-BUFFERSECONDS=2
+BUFFERSECONDS=3
 SCRIPTNAME=$(basename $0)
 
 # Check dependencies
