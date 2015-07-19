@@ -108,8 +108,8 @@ fi
 
 # get URL
 write_secret_to_config=false
-url_enc="jA0EAwMCzmbtLIotZtZgyT+NSxKv1ITh55OOTJHK+Vh4dE3qHgUCXWJNUfvJ8NuXlARyWi8K36WK
-8tald+GDf8c1kW9go8C8Z/p0+OPTt0c="
+url_enc="jA0EAwMCOuEeCPKtqEdgyT5Q/sdn8xqn1MLpNm2Apr0/a49AqyEdL5Uf7pKKCL1FbwM5DiCmt84D
+AV5K+itAzZ/hm7/6LEbDfUPKCZEH6g=="
 while [ -z "$SECRET" ]
 do
   echo -ne "\rEnter the secret to get the channel list: "
